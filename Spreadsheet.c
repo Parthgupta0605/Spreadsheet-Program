@@ -29,29 +29,54 @@ void create_sheet(struct cell ***sheet){
     }
 }
 
-// int name_to_index(char *s , int c){
-//     int count1=0, count2=0;
-//     int alphabet[3]={0}, number[3]={0};
-//     char *original_s = s;
-//     while(*s != '\0') s++;
-//     s--;
-//     while(s >= original_s){
-//         if ((*s >= 'A') && (*s <= 'Z')){
-//             count1++;
-//             alphabet[3-count1] = *s - 'A' + 1;
-//         }
-//         else if ((*s >= '0') && (*s <= '9')){
-//             count2++;
-//             number[3-count2] = *s - '0';
-//         }
-//         s--;
-//     }
-//     int a = alphabet[2] + alphabet[1] * 26 + alphabet[0] * 26 * 26;
-//     int b = number[2] + number[1] * 10 + number[0] * 100;
+int label_to_index(char *s, int* row, int* col){
+    int count1=0, count2=0;
+    int alphabet[3]={0}, number[3]={0};
+    char *original_s = s;
+    while(*s != '\0') s++;
+    s--;
+    while(s >= original_s){
+        if ((*s >= 'A') && (*s <= 'Z')){
+            count1++;
+            if(count2==0){
+              //  printf("Invalid cell \n");
+                return -1;                           // Invalid cell
+            }
+            if(count1 > 3) {
+               // printf("Invalid Input < 1<=C<=18278 \n");
+                return -1;
+            }
+            alphabet[3-count1] = *s - 'A' + 1;
+        }
+        else if ((*s >= '0') && (*s <= '9')){
+            count2++;
+            if(count1>0){
+              //  printf("Invalid cell \n");
+                return -1;
+            }
+            if(count2 > 3) {
+               // printf("Invalid Input < 1<=R<=999 \n");
+        
+                return -1;
+            }
+            number[3-count2] = *s - '0';
+        }
+        s--;
+    }
+    *col = alphabet[2] + alphabet[1] * 26 + alphabet[0] * 26 * 26 - 1;
+    *row = number[2] + number[1] * 10 + number[0] * 100 - 1;
     
-//     int result = (b-1) * c + a;
-//     return result;
-// }
+    return 0;
+}
+
+int col_label_to_index(const char *label) {
+    int index = 0;
+    while (*label) {
+        index = index * 26 + (*label - 'A' + 1);
+        label++;
+    }
+    return index - 1;
+}
 
 void col_index_to_label(int index, char *label) {
     char buffer[4] = {0};
@@ -92,6 +117,91 @@ int scroll(const char *input){
     return 0;
 }
 
+int evaluate_expression(char* expr, int rows, int cols, struct cell ***sheet, int *result){
+    int col1, col2, row1, row2;
+    int value1, value2;
+    char label1[4], label2[4];
+
+   // printf("Evaluating %s\n", expr); //debugging purpose
+    //VALUE
+
+    if(sscanf(expr, "%d", result) == 1) return 0; //NUMBER
+    // printf("Evaluating %s\n", expr); //debugging purpose
+
+    // if(sscanf(expr, "%[A-Z]%d", label1, &row1) == 2){
+    //      printf("Evaluating %s\n", expr); //debugging purpose
+    //     int col1 = col_label_to_index(label1);
+    //     row1--;
+    //     if (col1 < 0 || col1 >= cols || row1 < 0 || row1 >= rows) {
+    //         return -1; // Out-of-bounds error
+    //     }
+    //     *result = (*sheet)[row1][col1].val;
+    //     return 0; // Success
+    // }
+    //printf("Evaluating %s\n", expr);  //debugging purpose
+
+    //ARTHIMETIC EXPRESSIONS
+    char operator;
+    char expr1[MAX_INPUT_LEN], expr2[MAX_INPUT_LEN];
+    if (sscanf(expr, "%[^*+-/]%c%[^\n]", expr1,&operator,expr2)==3){
+      //  printf("%s %c %s\n", expr1, operator, expr2); //debugging purpose
+
+        if (sscanf(expr1, "%[A-Z]%d", label1,&row1)==2){
+            int col1 = col_label_to_index(label1);
+            row1--;
+            if (col1 < 0 || col1 >= cols || row1 < 0 || row1 >= rows) {
+                
+                return -1; // Out-of-bounds error
+            }
+            value1 = (*sheet)[row1][col1].val;
+        }
+        else if (sscanf(expr1, "%d", &value1)==1){
+            //do nothing
+        }
+        else{
+            return -1;
+        }
+        if (sscanf(expr2, "%[A-Z]%d", label2,&row2)==2){
+            int col2 = col_label_to_index(label2);
+            row2--;
+            if (col2 < 0 || col2 >= cols || row2 < 0 || row2 >= rows) {
+                
+                return -1; // Out-of-bounds error
+            }
+            value2 = (*sheet)[row2][col2].val;
+        }
+        else if (sscanf(expr2, "%d", &value2)==1){
+            //do nothing
+        }
+        else{
+            return -1;
+        }
+        switch (operator) {
+            case '+': *result = value1 + value2; return 0;
+            case '-': *result = value1 - value2; return 0;
+            case '*': *result = value1 * value2; return 0;
+            case '/': 
+                if (value2 == 0) return -2; // Division by zero error
+                *result = value1 / value2; 
+                break;
+            default: return -1; // Invalid operator
+        }
+       // printf("%d %c %d = %d\n", value1, operator, value2, *result); //debugging purpose
+    }
+    //expression is a cell
+    if(sscanf(expr, "%[A-Z]%d", label1, &row1) == 2){
+       //  printf("Evaluating %s\n", expr); //debugging purpose
+        int col1 = col_label_to_index(label1);
+        row1--;
+        if (col1 < 0 || col1 >= cols || row1 < 0 || row1 >= rows) {
+            return -1; // Out-of-bounds error
+        }
+        *result = (*sheet)[row1][col1].val;
+        return 0; // Success
+    }
+    return -1; // Invalid expression
+}
+
 int execute_command(const char *input, int rows, int cols, struct cell ***sheet) {
 
     if (strcmp(input, "q") == 0 || strcmp(input, "w") == 0 || strcmp(input, "s") == 0 || strcmp(input, "a") == 0 || strcmp(input, "d") == 0) {
@@ -99,7 +209,22 @@ int execute_command(const char *input, int rows, int cols, struct cell ***sheet)
         return scroll(input);
     }
 
-return -1;
+    char label[7], expr[MAX_INPUT_LEN];
+    int col,row, result;
+
+    if (sscanf(input, "%[^=]=%[^\n]", label, expr) == 2) {
+        label_to_index(label,&row,&col);
+        if (col < 0 || col >= C || row < 0 || row >= R) {
+            return -1; // Out-of-bounds error
+        }
+    if (evaluate_expression(expr, rows, cols, sheet, &result) == 0) {
+            (*sheet)[row][col].val = result;
+           // propagate_changes(rows, cols, sheet, row , col);
+            return 0; // Command executed successfully
+        }
+        return -1; // Invalid expression
+    }
+return -1; // Command not recognized
 }
 
 
@@ -108,7 +233,7 @@ int main(int argc, char *argv[]){
     char msg[100] = "ok";
     if (argc != 3) {
         printf("Usage: %s <No. of rows> <No. of columns>\n", argv[0]);
-        return 1;
+        return -1;
 }
 
     R = atoi(argv[1]); 
@@ -118,11 +243,11 @@ int main(int argc, char *argv[]){
 
     if (R>999 || R<1){
         printf("Invalid Input < 1<=R<=999 \n");
-        return 1;
+        return -1;
     }
     if (C>18278 || C<1){
         printf("Invalid Input < 1<=C<=18278 \n");
-        return 1;
+        return -1;
     }
 
     struct cell **sheet;
@@ -154,5 +279,9 @@ int main(int argc, char *argv[]){
 
 
     }
+    // char s[] = "AAA1";
+    // int row, col;
+    // label_to_index(s, &row, &col);
+    // printf("%d %d\n", row, col);
     return 0;
 }
