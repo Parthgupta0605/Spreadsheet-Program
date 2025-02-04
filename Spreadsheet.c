@@ -1,137 +1,72 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+#include <string.h>
+
+//global variables
+int R, C;
+
+struct cell{
+    int val;
+    struct cell **d;
+    int count;
+    };
+
+void create_sheet(struct cell ***sheet){
+    *sheet = (struct cell **)malloc(R * sizeof(struct cell *));
+    for (int i = 0; i < R; i++){
+        (*sheet)[i] = (struct cell *)malloc(C * sizeof(struct cell));
+        for (int j = 0; j < C; j++){
+            (*sheet)[i][j].val = 0;
+            (*sheet)[i][j].d = NULL;
+            (*sheet)[i][j].count = 0;
+        }
+    }
+}
 
 int name_to_index(char *s , int c){
-    int count1=0,count2=0;
-    int arr1[3]={0},arr2[3]={0};
-    while(*s!='\0') s++;
-    while(*s){
-        if ((atoi(*s) >= 65) && (atoi(*s) <= 90)){
+    int count1=0, count2=0;
+    int alphabet[3]={0}, number[3]={0};
+    char *original_s = s;
+    while(*s != '\0') s++;
+    s--;
+    while(s >= original_s){
+        if ((*s >= 'A') && (*s <= 'Z')){
             count1++;
-            arr1[3-count1]=atoi(*s) - 64;
+            alphabet[3-count1] = *s - 'A' + 1;
         }
-        else if ((atoi(*s) >= 48) && (atoi(*s) <= 57)){
+        else if ((*s >= '0') && (*s <= '9')){
             count2++;
-            arr2[3-count2]=atoi(*s) -48;
+            number[3-count2] = *s - '0';
         }
         s--;
     }
-    int a = arr1[2]+arr1[1]*26+arr1[0]*26*26;
-    int b = arr2[2]+arr2[1]*10+arr2[0]*100;
-    int result = (b-1)*c + a ;
+    int a = alphabet[2] + alphabet[1] * 26 + alphabet[0] * 26 * 26;
+    int b = number[2] + number[1] * 10 + number[0] * 100;
+    
+    int result = (b-1) * c + a;
     return result;
 }
-int main()
-{
-    int rows, columns;
-    char input ;
-    char state[20];
-    char first_row[18278][3];
-    int i=0; 
-    // adjacency list 
-    scanf("%d %d", &rows, &columns);
-    char exp_list[rows*columns+1][15];    
-    char ***adjacency_list = (char**)malloc((rows*columns+1)*sizeof(char**));
 
-    // initialization of first row
-    for (char c = 'A' ; c<='Z';c++){
-        first_row[i][0] = c;
-        i++;
+int main(int argc, char *argv[]){
+    char msg[100] = "ok";
+        if (argc != 3){
+        sprintf(msg, "Usage: %s <No. of rows> <No. of columns>", argv[0]);
     }
-    for (char c1 = 'A' ; c1<='Z';c1++){
-        for (char c2 = 'A' ; c2<='Z';c2++){
-            first_row[i][0] = c1;
-            first_row[i][1] = c2;
-            i++;
-        }
+    R = atoi(argv[1]); 
+    C = atoi(argv[2]);
+    clock_t start_time = clock();
+    if (R>999 || R<1){
+        sprintf(msg, "Invalid Input < 1<=R<=999 >");
     }
-    for (char c1 = 'A' ; c1<='Z';c1++){
-        for (char c2 = 'A' ; c2<='Z';c2++){
-            for (char c3 = 'A' ; c3<='Z';c3++){
-                first_row[i][0] = c1;
-                first_row[i][1] = c2;
-                first_row[i][2] = c3;
-                i++;
-            }
-        }
+    if (C>18278 || C<1){
+        sprintf(msg, "Invalid Input < 1<=C<=18278 >");
     }
+    clock_t end_time = clock();
+    double time_taken = ((double)(end_time - start_time)/CLOCKS_PER_SEC);
+    if (strcmp(msg, "ok")) {
 
-        // initialization of grid
-    int grid[rows][columns];
-    for (int i = 0; i < rows; i++)
-    {
-        for (int j = 0; j < columns; j++)
-        {
-            grid[i][j] = 0;
-        }
-    }
-
-    while (1)
-    {
-        int start_row = 0, start_col = 0;
-        int end_row, end_col;
-        if (rows >= 10)
-            end_row = 9;
-        else
-            end_row = rows-1;
-        if (columns >= 10)
-            end_col = 9;
-        else
-            end_col = columns-1;
-       
-        // Output 
-        printf("  ");
-        for (int i = start_col; i<=end_col; i++){
-            printf("%s ",first_row[i]);
-        }
-        printf("\n");
-        for(int i = start_row; i<=end_row; i++){
-            printf("%d ",(i+1));
-            for(int j = start_col; j<=end_col; j++){
-                printf("%d ",grid[i][j]);
-            }
-            printf("\n");
-        }
-        //printf("[%f] ",);
-        printf("(%s) >",state);
-        //
-
-        // Input
-        //
-
-        // recalculations         
-        switch (input){
-            case 'w' : 
-                if (end_row+1 == rows);
-                else {
-                    end_row+=1;
-                    start_row+=1;
-                }
-                break;
-            case 's' :
-                if (start_row == 0);
-                else {
-                end_row-=1;
-                start_row-=1;
-                }
-                break;
-            case 'a' :
-                if (end_col+1 == columns);
-                else {
-                end_col+=1;
-                start_col+=1;
-                }
-                break;
-            case 'd' : 
-                if (start_col==0);
-                else {
-                    start_col-=1;
-                    end_col-=1;
-                }
-                break;
-            case 'q' : 
-                // exit the program                
-        } 
-        //           
+        printf("[%.1f] (%s)", time_taken, msg);
     }
     return 0;
 }
