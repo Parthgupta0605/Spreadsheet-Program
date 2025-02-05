@@ -3,7 +3,7 @@
 #include <time.h>
 #include <string.h>
 
-#define MAX_INPUT_LEN 100
+#define MAX_INPUT_LEN 100 //need to change
 #define CHANGE 10
 
 //global variables
@@ -13,6 +13,10 @@ int start_col = 0;
 
 struct cell{
     int val;
+    int row;
+    int col;
+    char expression[MAX_INPUT_LEN];
+    int status; //to store err 
     struct cell **d;
     int count;
     };
@@ -25,11 +29,16 @@ void create_sheet(struct cell ***sheet){
             (*sheet)[i][j].val = 0;
             (*sheet)[i][j].d = NULL;
             (*sheet)[i][j].count = 0;
+            (*sheet)[i][j].status = 0;
+            (*sheet)[i][j].row = i;
+            (*sheet)[i][j].col = j;
+
         }
     }
 }
 
 int label_to_index(char *s, int* row, int* col){
+    if (strlen(s) > 6) return -1; // Prevent excessive length
     int count1=0, count2=0;
     int alphabet[3]={0}, number[3]={0};
     char *original_s = s;
@@ -101,50 +110,56 @@ void print_sheet(struct cell ***sheet) {
     for (int row = start_row; row < start_row + 10 && row<R ; row++) {
         printf("%d\t", row + 1);
         for (int col = start_col; col < start_col + 10 && col<C ; col++) {
-            printf("%d\t", (*sheet)[row][col].val);
+            if ((*sheet)[row][col].status == 1) {
+                printf("ERR\t");
+            } 
+            else printf("%d\t", (*sheet)[row][col].val);
         }
         printf("\n");
     }
 }
 
+void add_dependency(struct cell *c, struct cell *dep) {
+    struct cell **new_d = realloc((*c).d, ((*c).count + 1) * sizeof(struct cell *));
+    if (!new_d) {
+        printf("Memory allocation failed!\n");
+        return;
+    }
+    (*c).count++;
+    (*c).d = new_d;
+    (*c).d[(*c).count - 1] = dep;  // Add the dependency cell to the list
+}
+
 int scroll(const char *input){
     if (strcmp(input, "q") == 0) return 1; // Exit on 'q'
     
-    if (strcmp(input, "w") == 0 && start_row > 0) start_row -= 10; // Scroll up
+    if (strcmp(input, "w") == 0 && start_row - 10 >= 0) start_row -= 10; // Scroll up
+    else if (strcmp(input, "w") == 0 && start_row - 10 < 0) start_row = 0;
     else if (strcmp(input, "s") == 0 && start_row + 10 < R) start_row += 10; // Scroll down
-    else if (strcmp(input, "a") == 0 && start_col > 0) start_col -= 10; // Scroll left
+    else if (strcmp(input, "a") == 0 && start_col - 10 >= 0) start_col -= 10; // Scroll left
+    else if (strcmp(input, "a") == 0 && start_col - 10 < 0) start_col = 0; 
     else if (strcmp(input, "d") == 0 && start_col + 10 < C) start_col += 10; // Scroll right
     return 0;
 }
 
-int evaluate_expression(char* expr, int rows, int cols, struct cell ***sheet, int *result){
-    int col1, col2, row1, row2;
+//r1 r2 c1 c2 for add dependency
+int evaluate_expression(char* expr, int rows, int cols, struct cell ***sheet, int *result,int* r1, int* c1, int* r2, int* c2){
+    int col1, col2 , row1, row2;
+    *r1 = *c1= *r2 = *c2 = -1;
+
     int value1, value2;
     char label1[4], label2[4];
 
-   // printf("Evaluating %s\n", expr); //debugging purpose
     //VALUE
 
     if(sscanf(expr, "%d", result) == 1) return 0; //NUMBER
-    // printf("Evaluating %s\n", expr); //debugging purpose
-
-    // if(sscanf(expr, "%[A-Z]%d", label1, &row1) == 2){
-    //      printf("Evaluating %s\n", expr); //debugging purpose
-    //     int col1 = col_label_to_index(label1);
-    //     row1--;
-    //     if (col1 < 0 || col1 >= cols || row1 < 0 || row1 >= rows) {
-    //         return -1; // Out-of-bounds error
-    //     }
-    //     *result = (*sheet)[row1][col1].val;
-    //     return 0; // Success
-    // }
-    //printf("Evaluating %s\n", expr);  //debugging purpose
+    
 
     //ARTHIMETIC EXPRESSIONS
+
     char operator;
     char expr1[MAX_INPUT_LEN], expr2[MAX_INPUT_LEN];
     if (sscanf(expr, "%[^*+-/]%c%[^\n]", expr1,&operator,expr2)==3){
-      //  printf("%s %c %s\n", expr1, operator, expr2); //debugging purpose
 
         if (sscanf(expr1, "%[A-Z]%d", label1,&row1)==2){
             int col1 = col_label_to_index(label1);
@@ -153,6 +168,9 @@ int evaluate_expression(char* expr, int rows, int cols, struct cell ***sheet, in
                 
                 return -1; // Out-of-bounds error
             }
+            *r1 = row1;
+            *c1 = col1;
+            //add_dependency(&(*sheet)[row1][col1], &(*sheet)[row][col]);
             value1 = (*sheet)[row1][col1].val;
         }
         else if (sscanf(expr1, "%d", &value1)==1){
@@ -168,6 +186,9 @@ int evaluate_expression(char* expr, int rows, int cols, struct cell ***sheet, in
                 
                 return -1; // Out-of-bounds error
             }
+            *r2 = row2;
+            *c2 = col2;
+           // add_dependency(&(*sheet)[row2][col2], &(*sheet)[row][col]);
             value2 = (*sheet)[row2][col2].val;
         }
         else if (sscanf(expr2, "%d", &value2)==1){
@@ -181,16 +202,20 @@ int evaluate_expression(char* expr, int rows, int cols, struct cell ***sheet, in
             case '-': *result = value1 - value2; return 0;
             case '*': *result = value1 * value2; return 0;
             case '/': 
-                if (value2 == 0) return -2; // Division by zero error
+                if (value2 == 0) {
+                
+                    return -2; // Division by zero error
+                }
                 *result = value1 / value2; 
                 break;
             default: return -1; // Invalid operator
         }
-       // printf("%d %c %d = %d\n", value1, operator, value2, *result); //debugging purpose
     }
+
     //expression is a cell
+
     if(sscanf(expr, "%[A-Z]%d", label1, &row1) == 2){
-       //  printf("Evaluating %s\n", expr); //debugging purpose
+       
         int col1 = col_label_to_index(label1);
         row1--;
         if (col1 < 0 || col1 >= cols || row1 < 0 || row1 >= rows) {
@@ -202,6 +227,30 @@ int evaluate_expression(char* expr, int rows, int cols, struct cell ***sheet, in
     return -1; // Invalid expression
 }
 
+void propagate_changes(int rows, int cols, struct cell ***sheet, int row, int col) {
+    // static int visited[999][18278] = {0}; // Large array warning
+    // if (visited[row][col]) return;
+    // visited[row][col] = 1;
+    for (int i = 0; i < (*sheet)[row][col].count; i++) {
+        int r = (*(*sheet)[row][col].d[i]).row;
+        int c = (*(*sheet)[row][col].d[i]).col;
+        int result;
+        int r1,r2,c1,c2;
+        int return_value = evaluate_expression((*sheet)[r][c].expression, rows, cols, sheet, &result,&r1,&c1,&r2,&c2);
+        if (return_value == 0) {
+            (*sheet)[r][c].val = result;
+            propagate_changes(rows, cols, sheet, r, c);
+        }
+        else if (return_value == -2){
+            (*sheet)[r][c].status=1;
+            return;
+        }
+        // (*sheet)[r][c].val = result;
+        // propagate_changes(rows, cols, sheet, r, c);
+    }
+}
+
+
 int execute_command(const char *input, int rows, int cols, struct cell ***sheet) {
 
     if (strcmp(input, "q") == 0 || strcmp(input, "w") == 0 || strcmp(input, "s") == 0 || strcmp(input, "a") == 0 || strcmp(input, "d") == 0) {
@@ -211,17 +260,56 @@ int execute_command(const char *input, int rows, int cols, struct cell ***sheet)
 
     char label[7], expr[MAX_INPUT_LEN];
     int col,row, result;
+    char col_label[4]; 
+    int row1, col1, row2, col2;
 
-    if (sscanf(input, "%[^=]=%[^\n]", label, expr) == 2) {
-        label_to_index(label,&row,&col);
+    //SCROLL_TO
+    if(sscanf(input, "scroll_to %[A-Z]%d", col_label, &row) == 2){
+        int col = col_label_to_index(col_label);
+        
+        row--;
         if (col < 0 || col >= C || row < 0 || row >= R) {
             return -1; // Out-of-bounds error
         }
-    if (evaluate_expression(expr, rows, cols, sheet, &result) == 0) {
+        start_row = row;
+        start_col = col;
+        return 0;
+    }
+
+
+    if (sscanf(input, "%[^=]=%[^\n]", label, expr) == 2) {
+        if (label_to_index(label, &row, &col) < 0) {
+        
+        return -1; //Invalid cell
+        }
+        if (col < 0 || col >= C || row < 0 || row >= R) {
+            return -1; // Out-of-bounds error
+        }
+    int return_value = evaluate_expression(expr, rows, cols, sheet, &result,&row1,&col1,&row2,&col2);
+    if (return_value == 0) {
             (*sheet)[row][col].val = result;
-           // propagate_changes(rows, cols, sheet, row , col);
+            if(row1>=0 && col1>=0){
+                add_dependency( &(*sheet)[row1][col1],&(*sheet)[row][col]);
+            }
+            if(row2>=0 && col2>=0){
+                add_dependency(&(*sheet)[row2][col2],&(*sheet)[row][col]);
+            }
+            
+            strcpy((*sheet)[row][col].expression, expr);
+            propagate_changes(rows, cols, sheet, row , col);
             return 0; // Command executed successfully
         }
+    else if (return_value == -2){
+              if(row1>=0 && col1>=0){
+               add_dependency( &(*sheet)[row1][col1],&(*sheet)[row][col]);
+            }
+            if(row2>=0 && col2>=0){
+               add_dependency(&(*sheet)[row2][col2],&(*sheet)[row][col]);
+            }
+              strcpy((*sheet)[row][col].expression, expr);
+              (*sheet)[row][col].status=1;
+                return -2; // Division by zero error
+    }
         return -1; // Invalid expression
     }
 return -1; // Command not recognized
